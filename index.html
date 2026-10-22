@@ -339,6 +339,8 @@
   .nucleo-link{ flex-basis: 100%; font-size: 12px; color: var(--ink-soft); margin-top: 2px; cursor: default; }
   .nucleo-link a, .tp-link a{ color: var(--accent-blue); font-weight: 600; text-decoration: underline; cursor: pointer; }
   .tp-link{ display:block; margin-top: 8px; font-size: 13px; }
+  .tp-atend{ display:block; margin-top: 8px; padding: 8px 10px; background: #fff; border: 1px solid #BADCEC; font-size: 13.5px; line-height: 1.45; }
+  .card-atend{ flex-basis: 100%; font-size: 12.5px; color: var(--ink); background: rgba(255,255,255,0.7); border: 1px solid var(--line-strong); padding: 6px 9px; margin-top: 2px; }
   footer .updated-at{ color: var(--ink); font-weight: 500; }
   .glossario{ margin-top: 24px; background: var(--paper-raised); border: 1px solid var(--line-strong); padding: 20px 22px; }
   .glossario h2{ font-family:'Fraunces', serif; font-size: 18px; font-weight: 600; margin: 0 0 14px; }
@@ -830,6 +832,7 @@ function refreshInfo(){
     const t = INFO_TXT[info.tipo];
     panel.innerHTML = '<span class="tp-kicker">' + t.kicker + '</span>' + t.frase(infoMuni, info.sede) +
       '<span class="tp-status">' + (info.atende ? 'Há atendimento pela DPE' : 'Não há atendimento pela DPE') + '</span>' +
+      (atendidoNaSede(info) ? '<span class="tp-atend">Os assistidos de <strong>' + infoMuni + '</strong> serão atendidos na comarca sede de <strong>' + info.sede + '</strong>.</span>' : '') +
       (info.atende ? '<span class="tp-link">' + NUCLEO_LINK_HTML + '.</span>' : '') +
       (info.tipo === 'integrada' ? '<div class="obs-note">' + INTEGRADA_OBS_HTML + '</div>' : '');
     panel.hidden = false;
@@ -850,7 +853,7 @@ function refreshInfo(){
 
 function syncCardInfo(){
   document.querySelectorAll('#grid .card').forEach(c => {
-    c.querySelectorAll('.card-info, .nucleo-link').forEach(x => x.remove());
+    c.querySelectorAll('.card-info, .card-atend, .nucleo-link').forEach(x => x.remove());
     if (c.dataset.nome !== infoMuni) return;
     const info = termoInfo(infoMuni);
     if (info && info.sede){
@@ -858,11 +861,20 @@ function syncCardInfo(){
       d.className = 'card-info';
       d.innerHTML = INFO_TXT[info.tipo].curta(info.sede);
       c.appendChild(d);
+      if (atendidoNaSede(info)){
+        const a = document.createElement('div');
+        a.className = 'card-atend';
+        a.innerHTML = 'Os assistidos serão atendidos na comarca sede de <strong>' + info.sede + '</strong>.';
+        c.appendChild(a);
+      }
     }
     // link do núcleo: só aparece no município clicado (mapa ou lista) e só se houver atendimento
     addNucleoLink(c, state[infoMuni]);
   });
 }
+
+// assistidos de termo/agregada com atendimento são atendidos na comarca sede de referência
+function atendidoNaSede(info){ return !!(info && info.atende && info.sede && (info.tipo === 'termo' || info.tipo === 'agregada')); }
 
 function setInfo(nome){ infoMuni = nome; refreshInfo(); }
 
