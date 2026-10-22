@@ -334,6 +334,11 @@
   .card .obs-note{ flex-basis: 100%; margin-top: 4px; cursor: default; }
   .map-note{ margin-top: 12px; }
   .map-updated{ margin: 10px 0 0; font-family:'IBM Plex Mono', monospace; font-size: 11px; color: var(--ink-soft); }
+  footer .creditos{ margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--ink-soft); line-height: 1.6; }
+  footer .creditos a{ color: var(--accent-blue); word-break: break-all; }
+  .nucleo-link{ flex-basis: 100%; font-size: 12px; color: var(--ink-soft); margin-top: 2px; cursor: default; }
+  .nucleo-link a, .tp-link a{ color: var(--accent-blue); font-weight: 600; text-decoration: underline; cursor: pointer; }
+  .tp-link{ display:block; margin-top: 8px; font-size: 13px; }
   footer .updated-at{ color: var(--ink); font-weight: 500; }
   .glossario{ margin-top: 24px; background: var(--paper-raised); border: 1px solid var(--line-strong); padding: 20px 22px; }
   .glossario h2{ font-family:'Fraunces', serif; font-size: 18px; font-weight: 600; margin: 0 0 14px; }
@@ -468,6 +473,11 @@
   <footer>
     Fronteiras municipais: malha do IBGE (domínio público), via base geodata-br.
     <br><strong class="updated-at">Atualizado até 22/10/2026</strong>
+    <div class="creditos">
+      Produzido pela Corregedoria-Geral da Defensoria Pública do Estado do Rio Grande do Norte.<br>
+      Os endereços dos núcleos de atendimento podem ser consultados em
+      <a href="https://www.defensoria.rn.def.br/nucleos/telefones/" target="_blank" rel="noopener noreferrer">https://www.defensoria.rn.def.br/nucleos/telefones/</a>.
+    </div>
   </footer>
 </div>
 
@@ -764,6 +774,18 @@ const TERMO_DE = {"Água Nova": "Pau dos Ferros", "Alto do Rodrigues": "Pendênc
 let infoMuni = null;
 let refMuni = null;
 
+const NUCLEOS_URL = 'https://www.defensoria.rn.def.br/nucleos/telefones/';
+const NUCLEO_LINK_HTML = 'Clique <a href="' + NUCLEOS_URL + '" target="_blank" rel="noopener noreferrer">aqui</a> para ver o endereço do núcleo';
+// só municípios com atendimento da DPE têm o link do núcleo
+function temAtendimento(status){ return status === 'sede' || status === 'termoatende' || status === 'agregada'; }
+function addNucleoLink(card, status){
+  if (!temAtendimento(status)) return;
+  const d = document.createElement('div');
+  d.className = 'nucleo-link';
+  d.innerHTML = NUCLEO_LINK_HTML;
+  card.appendChild(d);
+}
+
 const INTEGRADA_OBS_HTML = '<strong>Observação:</strong> a integração de São Bento do Norte é regulamentada pela Resolução nº 43/2024 e pela Portaria Conjunta nº 11/2025 do TJRN.' +
   '<ul><li><strong>1ª Vara:</strong> corresponde ao juízo da Comarca de São Bento do Norte.</li>' +
   '<li><strong>2ª Vara:</strong> corresponde ao juízo da Comarca de Touros.</li></ul>';
@@ -784,6 +806,8 @@ function termoInfo(nome){
   const s = state[nome];
   if ((s === 'termoatende' || s === 'termonaoatende') && TERMO_DE[nome])
     return { tipo: 'termo', sede: TERMO_DE[nome], atende: s === 'termoatende' };
+  if (s === 'sede')
+    return { tipo: 'sede', sede: null, atende: true };
   if (s === 'agregada' && AGREGADA_A[nome])
     return { tipo: 'agregada', sede: AGREGADA_A[nome], atende: true };
   if (s === 'integradanaoatende' && INTEGRADA_A[nome])
@@ -792,6 +816,7 @@ function termoInfo(nome){
 }
 
 const INFO_TXT = {
+  sede:      { kicker: 'Comarca sede',      frase: (n) => '<strong>' + n + '</strong> é comarca sede.', curta: null },
   termo:     { kicker: 'Termo da comarca',     frase: (n, s) => '<strong>' + n + '</strong> é termo da comarca de <strong>' + s + '</strong>.',               curta: s => 'Termo da comarca de <strong>' + s + '</strong>' },
   agregada:  { kicker: 'Comarca agregada',  frase: (n, s) => '<strong>' + n + '</strong> é comarca agregada à comarca de <strong>' + s + '</strong>.', curta: s => 'Comarca agregada à comarca de <strong>' + s + '</strong>' },
   integrada: { kicker: 'Comarca integrada', frase: (n, s) => '<strong>' + n + '</strong> é comarca integrada a <strong>' + s + '</strong>.',          curta: s => 'Comarca integrada a <strong>' + s + '</strong>' }
@@ -805,13 +830,14 @@ function refreshInfo(){
     const t = INFO_TXT[info.tipo];
     panel.innerHTML = '<span class="tp-kicker">' + t.kicker + '</span>' + t.frase(infoMuni, info.sede) +
       '<span class="tp-status">' + (info.atende ? 'Há atendimento pela DPE' : 'Não há atendimento pela DPE') + '</span>' +
+      (info.atende ? '<span class="tp-link">' + NUCLEO_LINK_HTML + '.</span>' : '') +
       (info.tipo === 'integrada' ? '<div class="obs-note">' + INTEGRADA_OBS_HTML + '</div>' : '');
     panel.hidden = false;
   } else {
     panel.hidden = true; panel.innerHTML = '';
   }
   // contorno tracejado na comarca sede de referência
-  const newRef = info ? info.sede : null;
+  const newRef = info && info.sede ? info.sede : null;
   const changed = newRef !== refMuni;
   refMuni = newRef;
   applyMapStyles();
@@ -824,16 +850,17 @@ function refreshInfo(){
 
 function syncCardInfo(){
   document.querySelectorAll('#grid .card').forEach(c => {
-    const old = c.querySelector('.card-info'); if (old) old.remove();
-    if (c.dataset.nome === infoMuni){
-      const info = termoInfo(infoMuni);
-      if (info){
-        const d = document.createElement('div');
-        d.className = 'card-info';
-        d.innerHTML = INFO_TXT[info.tipo].curta(info.sede);
-        c.appendChild(d);
-      }
+    c.querySelectorAll('.card-info, .nucleo-link').forEach(x => x.remove());
+    if (c.dataset.nome !== infoMuni) return;
+    const info = termoInfo(infoMuni);
+    if (info && info.sede){
+      const d = document.createElement('div');
+      d.className = 'card-info';
+      d.innerHTML = INFO_TXT[info.tipo].curta(info.sede);
+      c.appendChild(d);
     }
+    // link do núcleo: só aparece no município clicado (mapa ou lista) e só se houver atendimento
+    addNucleoLink(c, state[infoMuni]);
   });
 }
 
@@ -1188,7 +1215,7 @@ function renderList(){
     card.dataset.nome = nome;
     if (selectedMuni === nome) card.classList.add('selected');
     card.addEventListener('click', (e) => {
-      if (e.target.closest('.toggles')) return; // botões de status não selecionam
+      if (e.target.closest('.toggles') || e.target.closest('a')) return; // botões de status e links não selecionam
       selectMuni(nome, true);
     });
     if (READONLY){
